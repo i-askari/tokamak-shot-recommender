@@ -1,6 +1,6 @@
 # Tokamak Shot Recommender
 
-**A search engine for fusion experiments.** A physicist describes how the DIII-D tokamak will be set up today, and the system finds the five most similar past shots, says which of them actually hit their targets, and recommends a plasma-current and beam-power program to command.
+**A search engine for DIID Experiment Runs.** A physicist can describe how the DIII-D tokamak is be set up that day, and this system finds the five most similar past shots based on selected physics parameters, determines which past shots  actually hit their targets, and recommends a plasma-current and beam-power program to command.
 
 Built solo during my Summer 2026 research internship at the **Princeton Plasma Physics Laboratory (PPPL)**, using data from the **DIII-D National Fusion Facility**.
 
@@ -14,7 +14,7 @@ Built solo during my Summer 2026 research internship at the **Princeton Plasma P
 
 | | |
 |---|---|
-| **Problem** | DIII-D has run hundreds of thousands of plasma discharges ("shots"), but the history lives in raw HDF5 diagnostic time series and free-text operator logbooks. There was no way to ask *"has anyone run a plasma like this, and did it work?"* |
+| **Problem** | DIII-D has run hundreds of thousands of historic plasma shots, but the history lives in raw HDF5 diagnostic time series and free-text operator logbooks. There was no way to ask *"has anyone run a shot like this, and was it sucessful"* |
 | **What I was given** | Access to the raw data: 4,014 HDF5 shot files and 3,062 logbook sessions (2012–2026) on Princeton's Stellar HPC cluster. |
 | **What I built** | Everything else. A 7-stage pipeline: physics parametrization → per-beam heating → target-vs-actual extraction → logbook sentiment → objective success metric → shot compilation → cosine-similarity search. |
 | **Scale** | 3,718 shots parametrized into a **77-dimensional physics feature vector**; 3,331 shots scored for objective success; 53,384 shots scored from operator notes. |
