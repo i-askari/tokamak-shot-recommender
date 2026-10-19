@@ -1,0 +1,7 @@
+numpy
+pandas
+scikit-learn
+matplotlib
+# only needed to rerun notebooks 01-06 against the raw archive
+h5py
+beautifulsoup4

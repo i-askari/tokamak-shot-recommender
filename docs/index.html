@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tokamak Shot Recommender</title>
+<meta name="description" content="A recommender system for fusion experiments: finds the most similar past DIII-D tokamak shots, scores which ones succeeded, and recommends a trajectory. Built at PPPL by Isabelle Askari.">
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --surface-2: #f2f1ed;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --accent: #2a78d6; --accent-wash: rgba(42,120,214,0.10); --accent-2: #eb6834;
+  --good: #0ca30c; --good-text: #006300; --critical: #d03b3b; --warning: #fab219;
+  --code: #f2f1ed;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+    --accent: #3987e5; --accent-wash: rgba(57,135,229,0.14); --accent-2: #d95926;
+    --good-text: #0ca30c; --code: #232321;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --surface-2: #232321;
+  --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10);
+  --accent: #3987e5; --accent-wash: rgba(57,135,229,0.14); --accent-2: #d95926;
+  --good-text: #0ca30c; --code: #232321;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--page); color: var(--ink);
+  font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+code { font: 0.86em/1.4 ui-monospace, "SF Mono", Menlo, monospace; background: var(--code);
+  padding: 0.1em 0.35em; border-radius: 4px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+@media (max-width: 600px) { .wrap { padding: 0 16px; } }
+
+/* nav */
+nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--page) 88%, transparent);
+  backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+nav .wrap { display: flex; align-items: center; gap: 20px; height: 52px; }
+nav .brand { font-weight: 650; letter-spacing: -0.01em; color: var(--ink); text-decoration: none; margin-right: auto; }
+nav a.l { color: var(--ink-2); text-decoration: none; font-size: 14px; }
+nav a.l:hover { color: var(--ink); }
+@media (max-width: 700px) { nav a.l.opt { display: none; } }
+
+/* hero */
+header.hero { padding: 72px 0 40px; }
+.eyebrow { font-size: 13px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+h1 { font-size: clamp(36px, 6vw, 60px); line-height: 1.04; letter-spacing: -0.03em; margin: 12px 0 18px; font-weight: 700; }
+.lede { font-size: clamp(18px, 2.2vw, 21px); color: var(--ink-2); max-width: 760px; margin: 0; }
+.cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 8px; font-size: 15px;
+  font-weight: 550; text-decoration: none; border: 1px solid var(--border); color: var(--ink); background: var(--surface); cursor: pointer; }
+.btn.primary { background: var(--ink); color: var(--page); border-color: var(--ink); }
+.btn:hover { filter: brightness(0.96); }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border);
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-top: 48px; }
+.stat { background: var(--surface); padding: 20px 22px; }
+.stat b { display: block; font-size: 32px; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; }
+.stat span { color: var(--ink-2); font-size: 14px; }
+@media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+
+section { padding: 56px 0; border-top: 1px solid var(--border); scroll-margin-top: 52px; }
+h2 { font-size: clamp(26px, 3.4vw, 34px); letter-spacing: -0.02em; line-height: 1.15; margin: 0 0 12px; }
+h3 { font-size: 18px; margin: 0 0 6px; letter-spacing: -0.01em; }
+.sub { color: var(--ink-2); max-width: 760px; margin: 0 0 28px; font-size: 17px; }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+@media (max-width: 820px) { .cols { grid-template-columns: 1fr; } }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
+.card p { margin: 0; color: var(--ink-2); font-size: 15px; }
+.card p + p { margin-top: 10px; }
+figure { margin: 0; }
+figure img { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--border); background: #fcfcfb; }
+figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; }
+
+/* pipeline */
+.pipe { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: step; }
+@media (max-width: 900px) { .pipe { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 520px) { .pipe { grid-template-columns: 1fr; } }
+.step { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 16px 14px; position: relative; }
+.step .n { font: 600 12px/1 ui-monospace, Menlo, monospace; color: var(--muted); }
+.step h3 { font-size: 15.5px; margin: 8px 0 6px; }
+.step p { margin: 0; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+.step .out { margin-top: 10px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.step.payoff { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.sources { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.chip-src { font-size: 13px; padding: 6px 10px; border-radius: 999px; background: var(--surface-2); color: var(--ink-2); }
+
+/* demo */
+.demo { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
+@media (max-width: 920px) { .demo { grid-template-columns: 1fr; } }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+.tabs { display: flex; gap: 4px; background: var(--surface-2); padding: 4px; border-radius: 9px; margin-bottom: 16px; }
+.tabs button { flex: 1; border: 0; background: transparent; padding: 8px; border-radius: 6px; font: inherit; font-size: 14px;
+  font-weight: 550; color: var(--ink-2); cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.12); }
+.presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.presets button, .beam { font: inherit; font-size: 12.5px; padding: 5px 9px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.presets button:hover, .beam:hover { color: var(--ink); border-color: var(--axis); }
+.lbl { font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; }
+.ctl { display: grid; grid-template-columns: 18px 1fr auto; gap: 4px 8px; align-items: center; margin-bottom: 8px; }
+.ctl label { font-size: 14px; color: var(--ink); }
+.ctl output { font: 13px ui-monospace, Menlo, monospace; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ctl input[type=range] { grid-column: 2 / 4; width: 100%; accent-color: var(--accent); margin: 0; }
+.ctl.off label, .ctl.off output { color: var(--muted); }
+.ctl input[type=checkbox] { accent-color: var(--accent); margin: 0; }
+.beams { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.beam[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.hint { font-size: 12.5px; color: var(--muted); margin: 10px 0 0; line-height: 1.45; }
+.shape { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
+.shape svg { flex: none; }
+.lookup { display: flex; gap: 8px; }
+.lookup input { flex: 1; min-width: 0; font: inherit; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink); }
+.err { color: var(--critical); font-size: 13px; min-height: 18px; margin-top: 6px; }
+
+.qcard { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; padding: 14px 16px; background: var(--surface-2); border-radius: 10px; margin-bottom: 14px; font-size: 14px; color: var(--ink-2); }
+.qcard b { color: var(--ink); font-weight: 600; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: 0.03em; text-transform: uppercase; padding: 0 8px 8px; border-bottom: 1px solid var(--grid); }
+td { padding: 10px 8px; border-bottom: 1px solid var(--grid); vertical-align: middle; }
+tr.row { cursor: pointer; }
+tr.row:hover td { background: var(--accent-wash); }
+td.num { font-variant-numeric: tabular-nums; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+.simbar { display: flex; align-items: center; gap: 8px; }
+.simbar i { display: block; height: 6px; border-radius: 3px; background: var(--accent); }
+.simbar .trk { flex: 1; min-width: 50px; height: 6px; border-radius: 3px; background: var(--accent-wash); }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; white-space: nowrap; }
+.badge::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.badge.ok::before { background: var(--good); } .badge.miss::before { background: var(--critical); }
+.badge.pos::before { background: var(--good); } .badge.neg::before { background: var(--critical); } .badge.mix::before { background: var(--warning); }
+.scen { color: var(--ink-2); font-size: 13px; }
+.src { color: var(--muted); font-size: 12px; }
+@media (max-width: 640px) { .hide-sm { display: none; } }
+
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+@media (max-width: 640px) { .charts { grid-template-columns: 1fr; } }
+.chart { position: relative; }
+.chart h4 { margin: 0 0 4px; font-size: 14px; font-weight: 600; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12.5px; color: var(--ink-2); margin-top: 10px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 16px; height: 2px; border-radius: 1px; background: var(--accent); }
+.legend .sw.band { height: 10px; background: var(--accent-wash); }
+.legend .sw.own { background: var(--muted); }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--page); font-size: 12px; line-height: 1.45;
+  padding: 6px 9px; border-radius: 6px; white-space: nowrap; opacity: 0; transition: opacity .08s; font-variant-numeric: tabular-nums; }
+.note { font-size: 13px; color: var(--muted); margin-top: 14px; }
+
+ul.lessons { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 820px) { ul.lessons { grid-template-columns: 1fr; } }
+ul.lessons li { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; font-size: 15px; color: var(--ink-2); }
+ul.lessons li b { color: var(--ink); display: block; margin-bottom: 4px; font-size: 15.5px; }
+footer { padding: 40px 0 64px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="brand" href="#">Shot Recommender</a>
+  <a class="l opt" href="#pipeline">Pipeline</a>
+  <a class="l" href="#demo">Live demo</a>
+  <a class="l opt" href="#how">How it works</a>
+  <a class="l" href="https://github.com/i-askari/tokamak-shot-recommender">GitHub</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <div class="eyebrow">Princeton Plasma Physics Laboratory · Summer 2026 research internship</div>
+  <h1>Tokamak Shot Recommender</h1>
+  <p class="lede">A search engine for fusion experiments. A physicist describes how the DIII-D tokamak will be set up today; the system finds the five most similar past shots, tells them which ones actually worked, and recommends what to command.</p>
+  <div class="cta">
+    <a class="btn primary" href="#demo">Try the live demo ↓</a>
+    <a class="btn" href="https://github.com/i-askari/tokamak-shot-recommender">View the code</a>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>3,718</b><span>real shots parametrized from raw HDF5</span></div>
+    <div class="stat"><b>77-D</b><span>physics feature vector per shot</span></div>
+    <div class="stat"><b>53,384</b><span>shots scored from operator logbooks</span></div>
+    <div class="stat"><b>7</b><span>pipeline stages, designed and built solo</span></div>
+  </div>
+</div></header>
+
+<section><div class="wrap cols">
+  <div>
+    <h2>The problem</h2>
+    <p class="sub" style="margin-bottom:0">DIII-D is the largest magnetic-fusion tokamak operating in the U.S. Each experiment (a <em>shot</em>) is a few-second plasma discharge, and the machine has run hundreds of thousands of them. Before a run day, physicists want to know: <strong>has anyone run a plasma like this before, and did it work?</strong></p>
+  </div>
+  <div class="card" style="align-self:end">
+    <p>The answer is buried in raw diagnostic time series (one HDF5 file per shot, hundreds of signals each) and in free-text operator logbooks. There was no way to query “shots like this one.”</p>
+    <p>I was handed the raw data and built everything else: the parametrization, the success metric, the logbook analysis, and the search.</p>
+  </div>
+</div></section>
+
+<section id="pipeline"><div class="wrap">
+  <h2>What I built: seven stages, one connected pipeline</h2>
+  <p class="sub">Each stage reads only what earlier stages produced, so every CSV/JSON is a checkpoint and any stage can be rerun alone. Ran on Princeton's Stellar HPC cluster.</p>
+  <div class="sources"><span class="chip-src">Input · 4,014 raw HDF5 shot files</span><span class="chip-src">Input · 3,062 logbook sessions (2012–2026)</span></div>
+  <div class="pipe">
+    <div class="step"><div class="n">01</div><h3>Parameter extraction</h3><p>Reduces each diagnostic to a robust peak (95th pct) and mean over the plasma window.</p><div class="out">3,718 shots × 88 columns</div></div>
+    <div class="step"><div class="n">02</div><h3>Per-beam NBI power</h3><p>Splits heating power across all 8 neutral beams; guards against corrupt arrays.</p><div class="out">+16 columns, 0 failures</div></div>
+    <div class="step"><div class="n">03</div><h3>Target vs. actual</h3><p>Pulls commanded and measured waveforms for plasma current and beam power, validated on reference shots.</p><div class="out">1 JSON per shot</div></div>
+    <div class="step"><div class="n">04</div><h3>Logbook sentiment</h3><p>Parses operator notes and attributes them to the <em>individual</em> shot, with labeled session fallback.</p><div class="out">53,384 shots scored</div></div>
+    <div class="step"><div class="n">05</div><h3>Success metric</h3><p>Objective: did the machine deliver what operators commanded, within 15 %?</p><div class="out">3,331 scored · 73 % hit</div></div>
+    <div class="step"><div class="n">06</div><h3>Full compilation</h3><p>One record per shot: experiment goal, sentiment, objective success, with honest coverage flags.</p><div class="out">Query-by-shot layer</div></div>
+    <div class="step payoff"><div class="n">07</div><h3>Similarity search</h3><p>Cosine similarity over 77 normalized parameters; query by shot number or by planned settings.</p><div class="out">Top-5 similar shots</div></div>
+    <div class="step"><div class="n">+</div><h3>Trajectory recommendation</h3><p>Blends the commanded waveforms of the similar shots that succeeded into one suggested program.</p><div class="out">Recommended I<sub>p</sub> and NBI</div></div>
+  </div>
+</div></section>
+
+<section id="demo"><div class="wrap">
+  <h2>Live demo</h2>
+  <p class="sub">The real archive is restricted, so this runs the same algorithms in your browser on a <strong>synthetic database of <span id="nshots">~1,150</span> shots</strong> generated with the same schema, so nothing here is real DIII-D data. Set up a shot and watch the recommendations update.</p>
+  <div class="demo">
+    <div class="panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-mode="plan">Plan a shot</button>
+        <button role="tab" aria-selected="false" data-mode="lookup">Look up a shot</button>
+      </div>
+      <div id="plan">
+        <div class="presets" id="presets"></div>
+        <div class="lbl">Neutral beams on (power each)</div>
+        <div class="beams" id="beams"></div>
+        <div class="ctl" style="margin-top:10px"><span></span><label for="bp">Power per beam</label><output id="bp-o"></output>
+          <input type="range" id="bp" min="1.5" max="2.6" step="0.05" value="2.0"></div>
+        <div class="lbl">Plasma (uncheck to leave at database mean)</div>
+        <div id="sliders"></div>
+        <div class="shape">
+          <svg id="shape" width="92" height="120" viewBox="0 0 92 120" aria-label="Plasma cross-section preview"></svg>
+          <p class="hint">Plasma cross-section from your elongation and triangularity. Unspecified parameters (ECH, gas) default to the database mean, exactly as in the original notebook.</p>
+        </div>
+      </div>
+      <div id="lookup" hidden>
+        <label class="lbl" for="shotin" style="display:block;margin-top:0">Shot number</label>
+        <div class="lookup"><input id="shotin" inputmode="numeric" placeholder="e.g. 900147"><button class="btn" id="go">Search</button></div>
+        <div class="err" id="err"></div>
+        <button class="btn" id="rand" style="width:100%;justify-content:center">Random shot</button>
+        <p class="hint">Tip: click any result row to search from that shot instead. The nearest neighbors are usually other shots from the same session, the same sanity check that passed on the real data.</p>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="qcard" id="qcard"></div>
+      <table>
+        <thead><tr><th>Shot</th><th>Similarity</th><th class="hide-sm">Scenario</th><th>Hit target?</th><th>Logbook</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="charts">
+        <div class="chart" id="c-ip"><h4>Recommended plasma current (MA)</h4></div>
+        <div class="chart" id="c-nbi"><h4>Recommended NBI power (MW)</h4></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <p class="note" id="trajnote"></p>
+    </div>
+  </div>
+</div></section>
+
+<section id="how"><div class="wrap">
+  <h2>How it works</h2>
+  <p class="sub">Four ideas carry the system. Figures below are from the synthetic database; the real-data numbers are in the next section.</p>
+  <div class="cols" style="margin-bottom:28px">
+    <div class="card"><h3>1 · Turn messy signals into physics parameters</h3>
+      <p>Raw diagnostics are time series of different lengths, sample rates and units, often with spikes and dropouts. I reduced each to a <strong>95th-percentile “peak”</strong> (robust to single-sample spikes, unlike max) and a <strong>mean</strong> over the 0–6 s plasma window.</p>
+      <p>The result is a fixed 77-number fingerprint: electron temperature and density, plasma current, plasma shape (elongation κ, triangularity δ, β<sub>N</sub>, q<sub>95</sub>), absorbed power from each of the 8 neutral beams, power from each of the 12 ECH gyrotrons, and flow from each of the 11 gas valves.</p></div>
+    <div class="card"><h3>2 · Define “success” objectively</h3>
+      <p>Logbooks are subjective and sparse, so I built an objective check: interpolate the measured signal onto the commanded timestamps and require <strong>peak actual within 15 % of peak target</strong>, for plasma current and total beam power independently.</p>
+      <p>Before trusting the target signals, I validated them on reference shots. Beam power matched to 1–2 %, which is consistent with known beam shine-through losses.</p></div>
+  </div>
+  <figure style="margin-bottom:28px"><img src="img/success_metric.png" alt="Two synthetic shots: one whose plasma current and beam power track their commands, and one that disrupted early and missed both targets." loading="lazy">
+    <figcaption>Left: a shot that delivered what was commanded. Right: an early disruption, so the current collapsed and the beams were interlocked off.</figcaption></figure>
+  <div class="cols" style="margin-bottom:28px">
+    <div class="card"><h3>3 · Read the operators' notes, per shot</h3>
+      <p>Each session's electronic logbook tags entries as <code>Shot &lt;number&gt; &lt;ROLE&gt;:</code>. I parsed these so sentiment attaches to the <em>specific shot</em> the note is about. Shots without their own note inherit the session summary, explicitly labeled as lower-quality signal.</p>
+      <p>Keyword lists were tuned for plasma vocabulary: “mode” and “clean” were removed because they false-matched “H-mode” and “wall cleaning.”</p></div>
+    <div class="card"><h3>4 · Search, then recommend</h3>
+      <p>Features are min-max normalized and compared with <strong>cosine similarity</strong>. Query by an existing shot number, or by planned settings (unspecified ones default to the database mean). Results come back enriched with success and sentiment.</p>
+      <p>The recommended trajectory blends the <em>commanded</em> waveforms of the neighbors that hit their targets, weighted by similarity, and shows their spread as a confidence band.</p></div>
+  </div>
+  <div class="cols">
+    <figure><img src="img/similarity_map.png" alt="PCA projection of all synthetic shots with a query shot and its five nearest neighbors highlighted." loading="lazy"><figcaption>Every shot is a point in 77-D space; neighbors cluster by experimental session.</figcaption></figure>
+    <figure><img src="img/recommended_trajectory.png" alt="Recommended plasma current and NBI power waveforms with a band showing the range across successful neighbors." loading="lazy"><figcaption>The recommendation is a command program, not just a list of shots.</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="results"><div class="wrap">
+  <h2>Results on the real archive</h2>
+  <p class="sub">Aggregate numbers from the full run on DIII-D data (no per-shot data is published here).</p>
+  <figure><img src="img/real_data_results.png" alt="Bar charts: coverage of the 3,718 real shots by each data source, and the share of shots in which each neutral beam fired." loading="lazy"></figure>
+  <div class="cols" style="margin-top:28px">
+    <div class="card"><h3>What worked</h3>
+      <p><strong>3,718 of 4,014</strong> shot files parametrized; the 292 failures were corrupt or truncated HDF5 files, all logged. <strong>3,331</strong> shots got an objective success score: 2,426 hit target, 905 missed.</p>
+      <p><strong>Sanity check passed:</strong> the nearest neighbor of real shot 144229 was 144230, the very next shot of the same session, followed by a cluster of shots from a related session (similarity 0.93–0.96).</p></div>
+    <div class="card"><h3>What I reported honestly</h3>
+      <p>Only <strong>483 shots (13 %)</strong> have goal text, sentiment, <em>and</em> a success score. I traced this to a scope mismatch: the logbooks span 2012–2026, while the HDF5 extraction covers a narrower slice. It is a data-coverage gap, not a pipeline bug, and it is the first thing to fix with a wider archive.</p></div>
+  </div>
+</div></section>
+
+<section id="lessons"><div class="wrap">
+  <h2>Engineering decisions &amp; what I'd do next</h2>
+  <p class="sub">The parts I'd want to talk through in an interview.</p>
+  <ul class="lessons">
+    <li><b>Validate a signal before trusting it.</b>The target signals were cross-checked against known actual values on reference shots before any scoring was built on them.</li>
+    <li><b>Fail one beam, not the whole shot.</b>About 15 shots had data/time arrays of mismatched length. A guard skips only the bad beam, which took the addendum from crashes to 3,718/3,718.</li>
+    <li><b>Checkpoint every stage.</b>Each stage writes a CSV/JSON consumed downstream, so a 4,000-file HDF5 pass never has to be rerun to iterate on scoring or search.</li>
+    <li><b>Label uncertainty instead of hiding it.</b>Sentiment carries its source (own note vs. session fallback); every compiled field is flagged available/unavailable.</li>
+    <li><b>Next: time-resolved success.</b>A peak-based check can call a shot successful even if it disrupted late in the flattop. A tracking-error metric over the whole waveform would catch that.</li>
+    <li><b>Next: smarter similarity.</b>Zero currently means both “beam off” and “diagnostic missing,” and all 77 features are equally weighted. Distinguishing missing data and learning feature weights from outcomes would sharpen matches.</li>
+  </ul>
+</div></section>
+
+<footer><div class="wrap">
+  Built by Isabelle Askari at the Princeton Plasma Physics Laboratory with data from the DIII-D National Fusion Facility. The demo uses a synthetic database generated by <code>shot_recommender/synthetic.py</code>; synthetic shot numbers start at 900000 and do not describe real experiments. · <a href="https://github.com/i-askari/tokamak-shot-recommender">Source on GitHub</a>
+</div></footer>
+
+<script>
+(async function () {
+  const $ = (s, el = document) => el.querySelector(s);
+  const svgNS = "http://www.w3.org/2000/svg";
+  const D = await (await fetch("data/demo.json")).json();
+  const C = D.columns, NC = C.length, col = Object.fromEntries(C.map((c, i) => [c, i]));
+  const byShot = new Map(D.shots.map(s => [s.n, s]));
+  const vecs = D.shots.map(s => { const v = s.v.map(x => x / 1000); let n = 0; for (const x of v) n += x * x; return { v, n: Math.sqrt(n) }; });
+  $("#nshots").textContent = D.shots.length.toLocaleString();
+
+  const norm = (i, x) => { const r = D.max[i] - D.min[i]; return r ? (x - D.min[i]) / r : x - D.min[i]; };
+  function rank(q, exclude, n = 5) {
+    let qn = 0; for (const x of q) qn += x * x; qn = Math.sqrt(qn);
+    const sims = D.shots.map((s, i) => {
+      if (s.n === exclude) return [-2, i];
+      let dot = 0; const v = vecs[i].v; for (let k = 0; k < NC; k++) dot += q[k] * v[k];
+      return [qn && vecs[i].n ? dot / (qn * vecs[i].n) : 0, i];
+    });
+    sims.sort((a, b) => b[0] - a[0]);
+    return sims.slice(0, n).map(([sim, i]) => ({ ...D.shots[i], sim }));
+  }
+
+  /* ---------- plan-a-shot controls ---------- */
+  const BEAMS = ["NB15L", "NB15R", "NB21L", "NB21R", "NB30L", "NB30R", "NB33L", "NB33R"];
+  const SL = [
+    { k: "peak_ip", l: "Plasma current", u: "MA", min: 0.5, max: 1.6, st: 0.05, v: 1.0, sc: 1e6, f: 2 },
+    { k: "peak_density", l: "Core density", u: "×10¹⁹ m⁻³", min: 1.5, max: 10, st: 0.25, v: 5, sc: 1e19, f: 1 },
+    { k: "peak_temp", l: "Core Tₑ", u: "keV", min: 0.8, max: 4.5, st: 0.1, v: 2.2, sc: 1e3, f: 1, on: false },
+    { k: "kappa", l: "Elongation κ", u: "", min: 1.1, max: 2.05, st: 0.01, v: 1.8, sc: 1, f: 2 },
+    { k: "tritop", l: "Triangularity δ", u: "", min: -0.55, max: 0.75, st: 0.01, v: 0.5, sc: 1, f: 2 },
+    { k: "betan", l: "Normalized beta βₙ", u: "", min: 0.3, max: 4, st: 0.05, v: 1.8, sc: 1, f: 2, on: false },
+    { k: "q95", l: "Safety factor q₉₅", u: "", min: 2.8, max: 9, st: 0.1, v: 4.5, sc: 1, f: 1, on: false },
+  ];
+  const PRESETS = {
+    "ELMy H-mode": { beams: ["NB30L", "NB30R", "NB33L"], bp: 2.2, peak_ip: 1.2, peak_density: 6, kappa: 1.8, tritop: 0.55 },
+    "Negative δ": { beams: ["NB15L", "NB33R"], bp: 2.0, peak_ip: 0.75, peak_density: 4.5, kappa: 1.35, tritop: -0.4 },
+    "ECH-heated": { beams: [], bp: 2.0, peak_ip: 0.8, peak_density: 3, kappa: 1.65, tritop: 0.35 },
+    "Notebook example": { beams: ["NB30L", "NB30R"], bp: 2.0, peak_ip: 1.0, kappa: 1.8, peak_density: null, tritop: null },
+  };
+  const beamOn = new Set(["NB30L", "NB30R", "NB33L"]);
+  const beamsEl = $("#beams");
+  BEAMS.forEach(b => {
+    const el = document.createElement("button"); el.className = "beam"; el.textContent = b.slice(2);
+    el.setAttribute("aria-pressed", beamOn.has(b)); el.title = "Neutral beam " + b.slice(2);
+    el.onclick = () => { beamOn.has(b) ? beamOn.delete(b) : beamOn.add(b); el.setAttribute("aria-pressed", beamOn.has(b)); runPlan(); };
+    beamsEl.append(el);
+  });
+  const bp = $("#bp"), bpo = $("#bp-o");
+  bp.oninput = () => { bpo.textContent = (+bp.value).toFixed(2) + " MW"; runPlan(); };
+  const sl = $("#sliders");
+  SL.forEach(s => {
+    const d = document.createElement("div"); d.className = "ctl";
+    d.innerHTML = `<input type="checkbox" ${s.on === false ? "" : "checked"} aria-label="Include ${s.l}"><label for="s-${s.k}">${s.l}</label><output></output>
+      <input type="range" id="s-${s.k}" min="${s.min}" max="${s.max}" step="${s.st}" value="${s.v}">`;
+    s.cb = d.children[0]; s.out = d.querySelector("output"); s.rg = d.querySelector("input[type=range]"); s.row = d;
+    const upd = () => { s.out.textContent = (+s.rg.value).toFixed(s.f) + (s.u ? " " + s.u : ""); d.classList.toggle("off", !s.cb.checked); };
+    s.rg.oninput = () => { s.cb.checked = true; upd(); runPlan(); };
+    s.cb.onchange = () => { upd(); runPlan(); };
+    upd(); sl.append(d);
+  });
+  const pr = $("#presets");
+  Object.entries(PRESETS).forEach(([name, p]) => {
+    const b = document.createElement("button"); b.textContent = name;
+    b.onclick = () => {
+      beamOn.clear(); p.beams.forEach(x => beamOn.add(x));
+      [...beamsEl.children].forEach((el, i) => el.setAttribute("aria-pressed", beamOn.has(BEAMS[i])));
+      bp.value = p.bp; bpo.textContent = (+bp.value).toFixed(2) + " MW";
+      SL.forEach(s => {
+        if (s.k in p) { s.cb.checked = p[s.k] !== null; if (p[s.k] !== null) s.rg.value = p[s.k]; }
+        else s.cb.checked = false;
+        s.rg.dispatchEvent(new Event("input")); if (!(s.k in p) || p[s.k] === null) { s.cb.checked = false; s.cb.dispatchEvent(new Event("change")); }
+      });
+      runPlan();
+    };
+    pr.append(b);
+  });
+  bpo.textContent = (+bp.value).toFixed(2) + " MW";
+
+  function drawShape() {
+    const svg = $("#shape"); svg.innerHTML = "";
+    const k = SL.find(s => s.k === "kappa"), t = SL.find(s => s.k === "tritop");
+    const kap = k.cb.checked ? +k.rg.value : 1.68, del = t.cb.checked ? +t.rg.value : 0.3;
+    const a = 30, cx = 46, cy = 60; let d = "";
+    for (let i = 0; i <= 64; i++) {
+      const th = i / 64 * 2 * Math.PI;
+      const x = cx + a * Math.cos(th + Math.asin(Math.max(-0.95, Math.min(0.95, del))) * Math.sin(th));
+      const y = cy - kap * a * Math.sin(th) * 0.95;
+      d += (i ? "L" : "M") + x.toFixed(1) + "," + y.toFixed(1);
+    }
+    const wall = document.createElementNS(svgNS, "rect");
+    Object.entries({ x: 4, y: 2, width: 84, height: 116, rx: 10, fill: "none", stroke: "var(--axis)", "stroke-width": 1 }).forEach(([k, v]) => wall.setAttribute(k, v));
+    const p = document.createElementNS(svgNS, "path");
+    Object.entries({ d: d + "Z", fill: "var(--accent-wash)", stroke: "var(--accent)", "stroke-width": 2, "stroke-linejoin": "round" }).forEach(([k, v]) => p.setAttribute(k, v));
+    svg.append(wall, p);
+  }
+
+  function runPlan() {
+    drawShape();
+    const q = D.mean.slice();
+    const specified = [];
+    SL.forEach(s => { if (s.cb.checked) { q[col[s.k]] = +s.rg.value * s.sc; specified.push(`${s.l} <b>${(+s.rg.value).toFixed(s.f)}${s.u ? " " + s.u : ""}</b>`); } });
+    BEAMS.forEach(b => { const p = beamOn.has(b) ? +bp.value * 1e6 : 0; q[col["peak_pabs_" + b]] = p; q[col["mean_pabs_" + b]] = p; });
+    const qv = q.map((x, i) => norm(i, x));
+    const beams = [...beamOn].map(b => b.slice(2)).join(", ") || "none";
+    render(rank(qv, null), `<span>Planned shot:</span> <span>Beams <b>${beams}</b>${beamOn.size ? ` @ <b>${(+bp.value).toFixed(2)} MW</b>` : ""}</span>` + specified.map(x => `<span>${x}</span>`).join(""), null);
+  }
+
+  function runLookup(n) {
+    const s = byShot.get(n);
+    if (!s) { $("#err").textContent = `Shot ${n || ""} isn't in the synthetic database (range ${D.shots[0].n}–${D.shots.at(-1).n}).`; return; }
+    $("#err").textContent = ""; $("#shotin").value = n;
+    const ses = D.sessions[s.ses];
+    render(rank(s.v.map(x => x / 1000), n),
+      `<span>Query: <b>shot ${n}</b></span><span>${D.scenarios[s.sc]}</span><span>Session ${String(s.ses).padStart(3, "0")}: ${ses.goal}${ses.scan !== "none" ? ` (${ses.scan} scan)` : ""}</span><span>${s.ok === null ? "" : s.ok ? "Hit its targets" : "Missed its targets"}</span>`, n);
+  }
+
+  /* ---------- results ---------- */
+  const SENT = { p: ["pos", "positive"], n: ["neg", "negative"], m: ["mix", "mixed"], "": ["", "n/a"] };
+  function render(res, qhtml, own) {
+    $("#qcard").innerHTML = qhtml;
+    $("#rows").innerHTML = res.map(r => {
+      const okc = r.ok === null ? ["", "n/a"] : r.ok ? ["ok", "Yes"] : ["miss", "No"];
+      const why = r.ok === false ? ` <span class="src">${r.ipd > 15 ? `I<sub>p</sub> ${r.ipd}% off` : `NBI ${r.nbd}% off`}</span>` : "";
+      const se = SENT[r.se];
+      return `<tr class="row" data-n="${r.n}" title="Search from shot ${r.n}">
+        <td class="num">${r.n}</td>
+        <td><div class="simbar"><span class="num" style="font:13px ui-monospace,Menlo,monospace">${r.sim.toFixed(3)}</span><span class="trk"><i style="width:${Math.max(0, r.sim) * 100}%"></i></span></div></td>
+        <td class="scen hide-sm">${D.scenarios[r.sc]}</td>
+        <td><span class="badge ${okc[0]}">${okc[1]}</span>${why}</td>
+        <td><span class="badge ${se[0]}">${se[1]}</span><br><span class="src">${r.src === "o" ? "own note" : "session fallback"}</span></td></tr>`;
+    }).join("");
+    document.querySelectorAll("tr.row").forEach(tr => tr.onclick = () => { setMode("lookup"); runLookup(+tr.dataset.n); });
+    trajectory(res, own);
+  }
+
+  function trajectory(res, own) {
+    const succ = res.filter(r => r.ok === true), used = succ.length ? succ : res;
+    const w = used.map(r => Math.max(r.sim, 1e-6)), W = w.reduce((a, b) => a + b, 0);
+    const T = D.t, L = T.length;
+    const sig = idx => {
+      const rec = new Array(L).fill(0), lo = new Array(L).fill(Infinity), hi = new Array(L).fill(-Infinity);
+      used.forEach((r, j) => { const y = D.waves[r.n][idx]; for (let i = 0; i < L; i++) { const v = y[i] / 1000; rec[i] += v * w[j] / W; lo[i] = Math.min(lo[i], v); hi[i] = Math.max(hi[i], v); } });
+      return { rec, lo, hi, own: own ? D.waves[own][idx].map(v => v / 1000) : null };
+    };
+    chart($("#c-ip"), sig(0), "MA");
+    chart($("#c-nbi"), sig(2), "MW");
+    $("#legend").innerHTML = `<span><i class="sw"></i>Recommended command</span><span><i class="sw band"></i>Range across ${used.length} shot${used.length > 1 ? "s" : ""} used</span>` + (own ? `<span><i class="sw own"></i>Query shot's own command</span>` : "");
+    $("#trajnote").textContent = succ.length
+      ? `Blended from the ${succ.length} of ${res.length} similar shots that hit their targets (shots ${succ.map(r => r.n).join(", ")}), weighted by similarity.`
+      : `None of the similar shots hit their targets, so all ${res.length} are blended. Treat this recommendation with caution.`;
+  }
+
+  function chart(host, s, unit) {
+    host.querySelectorAll("svg,.tip").forEach(e => e.remove());
+    const Wd = 420, H = 220, m = { l: 36, r: 10, t: 10, b: 26 }, T = D.t;
+    const ymax = Math.max(0.1, ...s.hi, ...(s.own || [0])) * 1.08;
+    const nice = ymax > 6 ? 2 : ymax > 3 ? 1 : ymax > 1.2 ? 0.5 : 0.25;
+    const X = t => m.l + (t / 6000) * (Wd - m.l - m.r), Y = v => H - m.b - (v / ymax) * (H - m.t - m.b);
+    const svg = document.createElementNS(svgNS, "svg"); svg.setAttribute("viewBox", `0 0 ${Wd} ${H}`);
+    let g = "";
+    for (let v = 0; v <= ymax; v += nice) g += `<line x1="${m.l}" x2="${Wd - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${m.l - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${+v.toFixed(2)}</text>`;
+    for (let t = 0; t <= 6000; t += 1000) g += `<text x="${X(t)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${t / 1000}${t === 6000 ? " s" : ""}</text>`;
+    g += `<line x1="${m.l}" x2="${Wd - m.r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--axis)"/>`;
+    const pts = a => a.map((v, i) => `${X(T[i]).toFixed(1)},${Y(v).toFixed(1)}`);
+    g += `<polygon points="${pts(s.hi).join(" ")} ${pts(s.lo).reverse().join(" ")}" fill="var(--accent-wash)"/>`;
+    if (s.own) g += `<polyline points="${pts(s.own).join(" ")}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    g += `<polyline points="${pts(s.rec).join(" ")}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    g += `<line class="xh" y1="${m.t}" y2="${H - m.b}" stroke="var(--axis)" opacity="0"/><circle class="dot" r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2" opacity="0"/>`;
+    g += `<rect x="${m.l}" y="0" width="${Wd - m.l - m.r}" height="${H - m.b}" fill="transparent"/>`;
+    svg.innerHTML = g;
+    const tip = document.createElement("div"); tip.className = "tip";
+    host.append(svg, tip);
+    const xh = svg.querySelector(".xh"), dot = svg.querySelector(".dot");
+    const move = e => {
+      const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) / r.width * Wd;
+      const i = Math.max(0, Math.min(T.length - 1, Math.round((px - m.l) / (Wd - m.l - m.r) * (T.length - 1))));
+      const x = X(T[i]); xh.setAttribute("x1", x); xh.setAttribute("x2", x); xh.setAttribute("opacity", 1);
+      dot.setAttribute("cx", x); dot.setAttribute("cy", Y(s.rec[i])); dot.setAttribute("opacity", 1);
+      tip.innerHTML = `t = ${(T[i] / 1000).toFixed(1)} s<br>Recommended ${s.rec[i].toFixed(2)} ${unit}<br>Range ${s.lo[i].toFixed(2)}–${s.hi[i].toFixed(2)}` + (s.own ? `<br>Query shot ${s.own[i].toFixed(2)}` : "");
+      const hx = x / Wd * r.width + (svg.offsetLeft || 0);
+      tip.style.left = Math.min(hx + 12, host.clientWidth - tip.offsetWidth) + "px"; tip.style.top = "28px"; tip.style.opacity = 1;
+    };
+    svg.addEventListener("pointermove", move);
+    svg.addEventListener("pointerleave", () => { tip.style.opacity = 0; xh.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); });
+  }
+
+  /* ---------- tabs ---------- */
+  function setMode(mode) {
+    document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.mode === mode));
+    $("#plan").hidden = mode !== "plan"; $("#lookup").hidden = mode !== "lookup";
+  }
+  document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+    setMode(b.dataset.mode);
+    if (b.dataset.mode === "plan") runPlan(); else runLookup(+$("#shotin").value || D.shots[147].n);
+  });
+  $("#go").onclick = () => runLookup(+$("#shotin").value);
+  $("#shotin").onkeydown = e => { if (e.key === "Enter") runLookup(+$("#shotin").value); };
+  $("#rand").onclick = () => runLookup(D.shots[Math.floor(Math.random() * D.shots.length)].n);
+  runPlan();
+})();
+</script>
+</body>
+</html>
