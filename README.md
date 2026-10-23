@@ -16,7 +16,7 @@ Built during my Summer 2026 research internship at the **Princeton Plasma Physic
 |---|---|
 | **Problem** | DIII-D has runs thousands of plasma shots, but the history lives in raw HDF5 diagnostic time series and free-text operator logbooks. There was no way to ask *"has anyone run a shot like this, and was it successful"* |
 | **What I was given** | Access to the raw data: 4,014 HDF5 shot files and 3,062 logbook sessions (2012–2026) on Princeton's Stellar HPC cluster. |
-| **What I built** | Everything else. A 7-stage pipeline: physics parametrization → per-beam heating → target-vs-actual extraction → logbook sentiment → objective success metric → shot compilation → cosine-similarity search. |
+| **What I built** | Everything else. A 7-stage pipeline for finding historical DIII-D tokamak shots similar to a desired experimental setup, using extracted physics parameters, objective target-vs-actual success scoring, and operator logbook sentiment.
 | **Scale** | 3,718 shots parametrized into a **77-dimensional physics feature vector**; 3,331 shots scored for objective success; 53,384 shots scored from operator notes. |
 | **Stack** | Python, NumPy, pandas, scikit-learn, h5py, BeautifulSoup, Jupyter, Slurm/HPC; vanilla JS + SVG for the web demo. |
 
