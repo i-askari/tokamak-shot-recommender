@@ -142,4 +142,4 @@ The DIII-D archive and operator logbooks are restricted research data, so **none
 
 ## Acknowledgments
 
-Thanks to my mentors at PPPL and the Princeton plasma control group, and to the DIII-D National Fusion Facility team whose data made this possible.
+Thanks to my mentors at PPPL Aza, Kouroche, and Peter, and the Princeton plasma control group, and to the DIII-D National Fusion Facility team whose data made this possible.
