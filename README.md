@@ -83,13 +83,6 @@ The **trajectory recommendation** keeps the neighbors that hit their targets and
 - **Sanity check passed:** the nearest neighbor of real shot 144229 was **144230**, the next shot in the same session, followed by a cluster from a related session (similarity 0.93–0.96).
 - **Reported honestly:** only 483 shots (13 %) have goal text, sentiment, *and* a success score. I traced this to a scope mismatch between the logbook archive (2012–2026) and the narrower HDF5 slice, so it is a data-coverage gap and not a pipeline bug.
 
-## Engineering decisions
-
-- **Validate a signal before trusting it.** Target signals were cross-checked on reference shots before any scoring depended on them.
-- **Fail one beam, not the whole shot.** About 15 shots had beam data and time arrays of mismatched length (e.g. 131,072 samples vs. 2 timestamps). A guard skips only that beam, which took the per-beam pass from crashing to 3,718 / 3,718 succeeded.
-- **Checkpoint every stage** so scoring and search can be iterated without re-reading the raw archive.
-- **Label uncertainty instead of hiding it.** Sentiment carries its source; every compiled field is flagged available/unavailable.
-
 ## Limitations & next steps
 
 - **Time-resolved success.** A peak-based check can call a shot successful even if it disrupted late in the flattop. A tracking-error metric over the whole waveform would catch that.
